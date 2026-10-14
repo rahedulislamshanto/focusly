@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4f4fb">
+  <meta name="description" content="A minimal productivity dashboard with daily tasks, bookmarks, Pomodoro timer, and notes.">
+  <title>Focusly — Productivity Dashboard</title>
+
+  <script>
+    (() => {
+      try {
+        const theme = localStorage.getItem("focusly-theme");
+        if (theme === "dark") document.documentElement.classList.add("dark");
+      } catch (_) {}
+    })();
+  </script>
+
+  <!-- Self-contained CSS: no external framework needed -->
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d0e1a;
+      --panel: #151728;
+      --panel-hover: #1c1f36;
+      --border: #262a45;
+      --text: #f2f2fa;
+      --muted: #9ca0bc;
+      --accent: #8b7cff;
+      --accent-2: #6c5ce7;
+    }
+
+    html:not(.dark) {
+      color-scheme: light;
+      --bg: #f4f4fb;
+      --panel: #ffffff;
+      --panel-hover: #ececf6;
+      --border: #dedef0;
+      --text: #1b1b2e;
+      --muted: #6d6e8c;
+      --accent: #6d5df6;
+      --accent-2: #5847d6;
+    }
+
+    html:not(.dark) body {
+      background-image: radial-gradient(900px 480px at 85% -10%, rgba(109,93,246,.10), transparent 60%);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      background-image: radial-gradient(900px 480px at 85% -10%, rgba(139,124,255,.13), transparent 60%);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      transition: background .25s ease, color .25s ease;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, input:focus-visible,
+    textarea:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(3,5,20,.20);
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    }
+
+    .panel:hover { border-color: #3a4066; }
+    html:not(.dark) .panel { box-shadow: 0 10px 26px rgba(84,72,200,.08); }
+    html:not(.dark) .panel:hover { border-color: #bfc0dd; }
+
+    .muted { color: var(--muted); }
+    .field {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: border-color .2s ease;
+    }
+    .field:focus { border-color: var(--accent); outline: none; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: transform .18s ease, background .18s ease, opacity .18s ease;
+      cursor: pointer;
+    }
+    .btn:active { transform: scale(.97); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(124,108,255,.35);
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+
+    .btn-secondary {
+      background: var(--panel-hover);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover { filter: brightness(1.12); }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      color: var(--muted);
+      transition: color .2s ease, background .2s ease;
+    }
+    .icon-btn:hover {
+      background: var(--panel-hover);
+      color: var(--text);
+    }
+
+    .task-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 10px;
+      border-radius: 11px;
+      transition: background .18s ease;
+    }
+    .task-row:hover { background: var(--panel-hover); }
+    .task-row.completed .task-title {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .task-check {
+      appearance: none;
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid #55555f;
+      border-radius: 6px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: background .2s ease, border-color .2s ease;
+    }
+    .task-check:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .task-check:checked::after {
+      content: "";
+      width: 5px;
+      height: 9px;
+      border: solid #ffffff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg) translate(-1px, -1px);
+    }
+
+    .priority {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 4px 7px;
+      white-space: nowrap;
+    }
+    .priority-high { color: #fb7185; background: rgba(244,63,94,.10); }
+    .priority-medium { color: #fbbf24; background: rgba(245,158,11,.10); }
+    .priority-low { color: #a1a1aa; background: rgba(161,161,170,.10); }
+
+    .bookmark {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 15px;
+      padding: 16px;
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+      transition: transform .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .bookmark:hover {
+      transform: translateY(-3px);
+      border-color: #3d4270;
+      background: var(--panel-hover);
+    }
+    html:not(.dark) .bookmark:hover { border-color: #b9bce0; }
+
+    .app-icon {
+      display: grid;
+      place-items: center;
+      width: 39px;
+      height: 39px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .timer-ring {
+      width: 190px;
+      height: 190px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--accent) var(--progress, 100%), var(--border) 0);
+      transition: background .3s linear;
+      position: relative;
+    }
+    .timer-ring::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: var(--panel);
+    }
+    .timer-inner {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .mode-btn {
+      padding: 7px 11px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: background .2s ease, color .2s ease;
+    }
+    .mode-btn.active {
+      background: var(--panel-hover);
+      color: var(--text);
+    }
+
+    .progress-track {
+      height: 5px;
+      width: 100%;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: inherit;
+      transition: width .25s ease;
+    }
+
+    ::selection { background: var(--accent); color: #ffffff; }
+
+    .social-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,.28);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .social-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.32); }
+
+    .toast {
+      position: fixed;
+      z-index: 100;
+      bottom: 24px;
+      left: 50%;
+      transform: translate(-50%, 12px);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--text);
+      color: var(--bg);
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 35px #0003;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+
+    .empty-state {
+      padding: 28px 12px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .timer-ring { width: 170px; height: 170px; }
+    }
+
+    /* ============ preflight (framework reset equivalents) ============ */
+    h1,h2,h3,h4,p{margin:0}
+    button{background:transparent;border:0;padding:0;color:inherit;cursor:pointer}
+    a{color:inherit}
+
+    /* ============ utility layer (self-contained, replaces framework CDN) ============ */
+    .block{display:block}.hidden{display:none}.flex{display:flex}.grid{display:grid}
+    .flex-col{flex-direction:column}.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}.flex-wrap{flex-wrap:wrap}
+    .items-center{align-items:center}.items-end{align-items:flex-end}.items-start{align-items:flex-start}
+    .justify-between{justify-content:space-between}.justify-center{justify-content:center}
+    .place-items-center{place-items:center}
+    .grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}
+    .grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .col-span-2{grid-column:span 2/span 2}
+    .gap-1{gap:4px}.gap-1\.5{gap:6px}.gap-2{gap:8px}.gap-3{gap:12px}.gap-4{gap:16px}.gap-6{gap:24px}
+    .space-y-1>*+*{margin-top:4px}.space-y-3>*+*{margin-top:12px}.space-y-6>*+*{margin-top:24px}
+    .mx-auto{margin-left:auto;margin-right:auto}
+    .max-w-7xl{max-width:80rem}.max-w-lg{max-width:32rem}
+    .min-w-0{min-width:0}.min-w-28{min-width:7rem}.min-h-40{min-height:10rem}
+    .w-full{width:100%}.w-2{width:8px}.w-2\.5{width:10px}.w-9{width:36px}.w-10{width:40px}
+    .h-2{height:8px}.h-2\.5{height:10px}.h-9{height:36px}.h-10{height:40px}
+    .p-1{padding:4px}.p-3{padding:12px}.p-4{padding:16px}.p-5{padding:20px}
+    .px-2\.5{padding-left:10px;padding-right:10px}.px-3{padding-left:12px;padding-right:12px}
+    .px-3\.5{padding-left:14px;padding-right:14px}.px-4{padding-left:16px;padding-right:16px}
+    .px-5{padding-left:20px;padding-right:20px}
+    .py-1\.5{padding-top:6px;padding-bottom:6px}.py-2{padding-top:8px;padding-bottom:8px}
+    .py-2\.5{padding-top:10px;padding-bottom:10px}.py-3{padding-top:12px;padding-bottom:12px}
+    .py-5{padding-top:20px;padding-bottom:20px}.py-7{padding-top:28px;padding-bottom:28px}
+    .pt-4{padding-top:16px}.pb-5{padding-bottom:20px}
+    .\!px-3{padding-left:12px!important;padding-right:12px!important}
+    .\!py-2{padding-top:8px!important;padding-bottom:8px!important}
+    .mt-1{margin-top:4px}.mt-1\.5{margin-top:6px}.mt-2{margin-top:8px}.mt-3{margin-top:12px}
+    .mt-4{margin-top:16px}.mt-5{margin-top:20px}.mt-6{margin-top:24px}.mt-10{margin-top:40px}
+    .mb-1\.5{margin-bottom:6px}.mb-3{margin-bottom:12px}.mb-5{margin-bottom:20px}
+    .mb-6{margin-bottom:24px}.mb-8{margin-bottom:32px}.ml-1{margin-left:4px}
+    .text-xs{font-size:12px;line-height:16px}.text-sm{font-size:14px;line-height:20px}
+    .text-base{font-size:16px;line-height:24px}.text-lg{font-size:18px;line-height:28px}
+    .text-2xl{font-size:24px;line-height:32px}.text-4xl{font-size:36px;line-height:40px}
+    .text-\[11px\]{font-size:11px}
+    .font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}.font-extrabold{font-weight:800}
+    .uppercase{text-transform:uppercase}.tracking-tight{letter-spacing:-.025em}
+    .tracking-\[\.15em\]{letter-spacing:.15em}.tracking-\[\.18em\]{letter-spacing:.18em}
+    .leading-5{line-height:20px}.leading-6{line-height:24px}
+    .text-center{text-align:center}.text-right{text-align:right}
+    .tabular-nums{font-variant-numeric:tabular-nums}.no-underline{text-decoration:none}
+    .text-white{color:#fff}.break-words{overflow-wrap:break-word}
+    .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .border{border:1px solid var(--border)}.border-t{border-top:1px solid var(--border)}
+    .rounded-lg{border-radius:8px}.rounded-xl{border-radius:12px}.rounded-full{border-radius:9999px}
+    .overflow-hidden{overflow:hidden}.resize-y{resize:vertical}
+    .transition{transition-property:color,background-color,border-color,opacity,transform;transition-duration:.18s;transition-timing-function:ease}
+    .transition-transform{transition-property:transform;transition-duration:.18s;transition-timing-function:ease}
+    .accent-violet-500{accent-color:#8b5cf6}
+    .hover\:text-rose-400:hover{color:#fb7185}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media (min-width:640px){
+      .sm\:block{display:block}.sm\:col-span-1{grid-column:span 1/span 1}
+      .sm\:flex-row{flex-direction:row}.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .sm\:items-center{align-items:center}.sm\:p-6{padding:24px}.sm\:p-8{padding:32px}
+      .sm\:pb-6{padding-bottom:24px}.sm\:px-6{padding-left:24px;padding-right:24px}
+      .sm\:py-8{padding-top:32px;padding-bottom:32px}
+      .sm\:text-3xl{font-size:30px;line-height:36px}.sm\:text-5xl{font-size:48px;line-height:1}
+      .sm\:text-right{text-align:right}
+    }
+    @media (min-width:1024px){
+      .lg\:col-span-2{grid-column:span 2/span 2}
+      .lg\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .lg\:px-8{padding-left:32px;padding-right:32px}
+    }
+
+    /* ============ modern design layer ============ */
+    html{scroll-behavior:smooth}
+    .panel{
+      background:color-mix(in srgb, var(--panel) 86%, transparent);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      border-radius:20px;
+    }
+    @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    main>*{animation:rise .65s cubic-bezier(.22,.8,.3,1) both}
+    main>*:nth-child(2){animation-delay:.07s}
+    main>*:nth-child(3){animation-delay:.14s}
+    main>*:nth-child(4){animation-delay:.21s}
+    main>*:nth-child(5){animation-delay:.28s}
+    #hero-time{
+      background:linear-gradient(120deg, var(--text) 30%, var(--accent));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+    .btn{border-radius:12px}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{position:relative;overflow:hidden}
+    .btn-primary::after{
+      content:"";position:absolute;inset:0;
+      background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+      transform:translateX(-120%);transition:transform .6s ease;
+    }
+    .btn-primary:hover::after{transform:translateX(120%)}
+    .field{border-radius:12px}
+    .field:focus{box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent)}
+    .timer-ring{box-shadow:0 0 48px color-mix(in srgb, var(--accent) 28%, transparent)}
+    .task-row{border-radius:14px}
+    .bookmark{border-radius:16px}
+    .chip,.priority{backdrop-filter:blur(6px)}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px;border:2px solid var(--bg)}
+    ::-webkit-scrollbar-thumb:hover{background:var(--accent-2)}
+
+
+    .motivation-line{font-style:italic;color:var(--muted);min-height:2.6em;transition:opacity .45s ease}
+    .bookmark-wrap{position:relative;min-width:0}
+    .bookmark-wrap .bookmark{height:100%}
+    .bookmark-remove{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:#e11d48;color:#fff;font-size:14px;line-height:1;display:none;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35);z-index:2}
+    #bookmark-grid.editing .bookmark-remove{display:inline-flex}
+    #bookmark-grid.editing .bookmark{pointer-events:none}
+
+    @media (max-width:520px){
+      .logo-tag{display:none}
+      #region-select{width:128px !important}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+    <!-- Header -->
+    <header class="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <a href="#" class="flex items-center gap-3 no-underline" aria-label="Focusly home">
+        <div class="grid h-10 w-10 place-items-center rounded-xl" style="background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 6px 16px rgba(124,108,255,.35)"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="40 13" transform="rotate(-50 12 12)"/><circle cx="12" cy="12" r="3.2" fill="#fff"/></svg></div>
+        <div>
+          <div class="text-base font-bold tracking-tight">Focusly</div>
+          <div class="muted logo-tag text-xs">Your personal workspace</div>
+        </div>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <p id="header-date" class="muted hidden text-xs sm:block"></p>
+          <p id="header-time" class="mt-1 hidden text-sm font-semibold tabular-nums sm:block"></p>
+          <select id="region-select" class="field mt-2 px-2 py-1 text-xs" style="display:block;margin-left:auto;width:150px" aria-label="Region">
+            <option value="">Local time</option>
+          </select>
+        </div>
+        <button id="theme-toggle" class="icon-btn border" style="border-color:var(--border)" aria-label="Toggle color theme" title="Toggle theme">
+          <svg id="theme-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+
+    <!-- Greeting -->
+    <section class="panel mb-6 overflow-hidden p-5 sm:p-8" style="background:radial-gradient(620px 220px at 92% -10%, rgba(139,124,255,.16), transparent 62%), var(--panel)" aria-labelledby="greeting-title">
+      <div class="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+        <div>
+          <div class="mb-3 flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full" style="background:var(--accent)"></span>
+            <span class="muted text-xs font-medium uppercase tracking-[.15em]">Your daily workspace</span>
+          </div>
+          <h1 id="greeting-title" class="text-2xl font-bold tracking-tight sm:text-3xl">Good morning.</h1>
+          <p class="muted mt-2 max-w-lg text-sm leading-6">One thing at a time. Focus on what matters, make steady progress, and let the small wins add up.</p>
+        </div>
+        <div class="sm:text-right">
+          <p id="motivation-text" class="motivation-line mb-3 text-sm">You don't need a perfect day. You just need a good next step.</p>
+          <p id="hero-time" class="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">09:00</p>
+          <p id="hero-date" class="muted mt-2 text-sm"></p>
+          <p class="mt-3 text-xs" style="color:var(--accent)">● Make today count</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick stats -->
+    <section class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Daily overview">
+      <div class="panel p-4">
+        <p class="muted text-xs">Tasks completed</p>
+        <div class="mt-3 flex items-end justify-between gap-2">
+          <span id="stat-completed" class="text-2xl font-bold tabular-nums">0</span>
+          <span id="stat-task-total" class="muted text-xs">of 0 tasks</span>
+        </div>
+        <div class="progress-track mt-3"><div id="task-progress" class="progress-fill" style="width:0%"></div></div>
+      </div>
+      <div class="panel p-4">
+        <p class="muted text-xs">Focus sessions today</p>
+        <div class="mt-3 flex items-end justify-between gap-2">
+          <span id="stat-sessions" class="text-2xl font-bold tabular-nums">0</span>
+          <span class="muted text-xs">completed</span>
+        </div>
+        <p class="muted mt-3 text-xs">Small steps, real progress.</p>
+      </div>
+      <div class="panel col-span-2 p-4 sm:col-span-1">
+        <p class="muted text-xs">Focus time today</p>
+        <div class="mt-3 flex items-end justify-between gap-2">
+          <span id="stat-focus" class="text-2xl font-bold tabular-nums">0m</span>
+          <span class="muted text-xs">deep work</span>
+        </div>
+        <p class="muted mt-3 text-xs">Protect your attention.</p>
+      </div>
+    </section>
+
+    <!-- Main workspace -->
+    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      <div class="space-y-6 lg:col-span-2">
+        <!-- Tasks -->
+        <section class="panel p-5 sm:p-6" aria-labelledby="tasks-heading">
+          <div class="mb-5 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="tasks-heading" class="text-base font-semibold">Today's tasks</h2>
+              <p class="muted mt-1 text-xs">Prioritize your work. Keep moving.</p>
+            </div>
+            <span id="task-count-badge" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="background:var(--panel-hover)">0 tasks</span>
+          </div>
+
+          <form id="task-form" class="mb-5 flex flex-col gap-2 sm:flex-row" autocomplete="off" novalidate>
+            <label class="sr-only" for="task-input">Task name</label>
+            <input id="task-input" class="field min-w-0 flex-1 px-3.5 py-3 text-sm" maxlength="180" required placeholder="What needs to get done?">
+            <label class="sr-only" for="task-priority">Task priority</label>
+            <select id="task-priority" class="field px-3 py-3 text-sm">
+              <option value="high">High priority</option>
+              <option value="medium" selected>Medium priority</option>
+              <option value="low">Low priority</option>
+            </select>
+            <button id="add-task-btn" class="btn btn-primary" type="submit">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              Add task
+            </button>
+          </form>
+
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-1 rounded-lg p-1" style="background:var(--bg)" role="group" aria-label="Filter tasks">
+              <button type="button" class="mode-btn active" data-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="mode-btn" data-filter="active" aria-pressed="false">Pending</button>
+              <button type="button" class="mode-btn" data-filter="completed" aria-pressed="false">Completed</button>
+            </div>
+            <button id="clear-completed" type="button" class="muted text-xs transition hover:text-rose-400">Clear completed</button>
+          </div>
+
+          <div id="task-list" class="space-y-1" aria-live="polite" aria-relevant="additions removals text">
+            <div class="empty-state">Your task list is ready. Add your first task above.</div>
+          </div>
+        </section>
+
+        <!-- Bookmarks -->
+        <section class="panel p-5 sm:p-6" aria-labelledby="bookmarks-heading">
+          <div class="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 id="bookmarks-heading" class="text-base font-semibold">Quick access</h2>
+              <p class="muted mt-1 text-xs">Your everyday tools, one click away.</p>
+            </div>
+            <button id="edit-bookmarks" type="button" class="btn btn-secondary !px-3 !py-2 text-xs">Edit links</button>
+          </div>
+
+          <div id="bookmark-grid" class="grid grid-cols-2 gap-3 sm:grid-cols-3"></div>
+
+          <form id="bookmark-form" class="mt-4 hidden space-y-3 rounded-xl border p-4" style="border-color:var(--border)" autocomplete="off" novalidate>
+            <p class="text-sm font-semibold">Add your own app link</p>
+            <label class="block text-xs muted" for="bookmark-name">App name</label>
+            <input id="bookmark-name" class="field w-full px-3 py-2.5 text-sm" maxlength="40" placeholder="e.g. YouTube">
+            <label class="block text-xs muted" for="bookmark-url">Website URL</label>
+            <input id="bookmark-url" class="field w-full px-3 py-2.5 text-sm" maxlength="500" placeholder="https://example.com">
+            <div class="flex gap-2">
+              <button id="add-link-btn" class="btn btn-primary" type="submit">Add link</button>
+              <button id="cancel-bookmark" class="btn btn-secondary" type="button">Done</button>
+            </div>
+            <p class="muted text-xs">The app's first letter becomes its logo. While editing, tap the × badge on a tile to remove it. Saved locally in this browser.</p>
+          </form>
+        </section>
+      </div>
+
+      <!-- Right column -->
+      <div class="space-y-6">
+        <!-- Pomodoro -->
+        <section class="panel p-5 sm:p-6" aria-labelledby="timer-heading">
+          <div class="mb-5">
+            <h2 id="timer-heading" class="text-base font-semibold">Focus timer</h2>
+            <p class="muted mt-1 text-xs">Work with intention. Rest without guilt.</p>
+          </div>
+
+          <div class="mb-5 flex justify-center gap-1 rounded-xl p-1" style="background:var(--bg)" role="group" aria-label="Timer mode">
+            <button type="button" class="mode-btn active flex-1" data-mode="focus" aria-pressed="true">Focus</button>
+            <button type="button" class="mode-btn flex-1" data-mode="short" aria-pressed="false">Short break</button>
+            <button type="button" class="mode-btn flex-1" data-mode="long" aria-pressed="false">Long break</button>
+          </div>
+
+          <div class="flex justify-center py-3">
+            <div id="timer-ring" class="timer-ring" role="timer" aria-label="25 minutes remaining">
+              <div class="timer-inner">
+                <div id="timer-display" class="text-4xl font-semibold tracking-tight tabular-nums">25:00</div>
+                <div id="timer-status" class="muted mt-2 text-xs">Ready to focus</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 flex justify-center gap-3">
+            <button id="timer-start" type="button" class="btn btn-primary min-w-28">
+              <svg id="timer-start-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+              <span id="timer-start-label">Start focus</span>
+            </button>
+            <button id="timer-reset" type="button" class="btn btn-secondary" aria-label="Reset timer">Reset</button>
+          </div>
+
+          <div class="mt-6 flex items-center justify-between border-t pt-4" style="border-color:var(--border)">
+            <div>
+              <p class="text-xs font-medium">Sessions completed</p>
+              <p class="muted mt-1 text-xs">Today</p>
+            </div>
+            <div id="session-dots" class="flex items-center gap-1.5" aria-label="0 focus sessions completed"></div>
+          </div>
+
+          <details class="mt-4">
+            <summary class="flex items-center justify-between py-2 text-xs font-medium">
+              <span>Timer settings</span>
+              <span class="muted">Customize <span aria-hidden="true">⌄</span></span>
+            </summary>
+            <form id="timer-settings" class="mt-3 space-y-3" novalidate>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label for="setting-focus" class="muted mb-1.5 block text-xs">Focus (min)</label>
+                  <input id="setting-focus" class="field w-full px-2.5 py-2 text-sm" type="number" min="1" max="120" value="25" required>
+                </div>
+                <div>
+                  <label for="setting-short" class="muted mb-1.5 block text-xs">Short (min)</label>
+                  <input id="setting-short" class="field w-full px-2.5 py-2 text-sm" type="number" min="1" max="60" value="5" required>
+                </div>
+                <div>
+                  <label for="setting-long" class="muted mb-1.5 block text-xs">Long (min)</label>
+                  <input id="setting-long" class="field w-full px-2.5 py-2 text-sm" type="number" min="1" max="90" value="15" required>
+                </div>
+              </div>
+              <label class="flex items-center gap-2 text-xs">
+                <input id="setting-autostart" type="checkbox" class="accent-violet-500">
+                Automatically start the next session
+              </label>
+              <button id="save-settings-btn" class="btn btn-secondary w-full" type="submit">Save settings</button>
+            </form>
+          </details>
+        </section>
+
+        <!-- Notes -->
+        <section class="panel overflow-hidden" aria-labelledby="notes-heading">
+          <details id="notes-details" open>
+            <summary class="flex items-center justify-between gap-3 p-5 sm:p-6">
+              <div>
+                <h2 id="notes-heading" class="text-base font-semibold">Quick notes</h2>
+                <p class="muted mt-1 text-xs">Thoughts, ideas, reminders.</p>
+              </div>
+              <span id="notes-chevron" class="muted text-lg transition-transform" aria-hidden="true">⌄</span>
+            </summary>
+            <div class="px-5 pb-5 sm:px-6 sm:pb-6">
+              <label for="notes-area" class="sr-only">Your notes</label>
+              <textarea id="notes-area" class="field min-h-40 w-full resize-y p-3 text-sm leading-6" maxlength="20000" placeholder="Write down an idea before it slips away..."></textarea>
+              <div class="mt-3 flex items-center justify-between gap-3">
+                <span id="notes-status" class="muted text-xs" aria-live="polite">Saved locally</span>
+                <button id="clear-notes" type="button" class="muted text-xs transition hover:text-rose-400">Clear notes</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+      </div>
+    </div>
+
+    <footer class="mt-10 border-t py-7 text-center" style="border-color:var(--border)">
+      <p class="text-sm">Developed by <span class="font-bold" style="color:var(--accent)">Rahedul</span></p>
+      <p class="muted mt-1.5 text-xs">Focusly <span aria-hidden="true">&middot;</span> A little more focus, every day. Your tasks and notes stay in this browser.</p>
+      <p class="muted mt-6 text-[11px] font-semibold uppercase tracking-[.18em]">Connect</p>
+      <div class="mt-3 flex items-center justify-center gap-3">
+        <a href="https://www.facebook.com/rahedulshanto" target="_blank" rel="noopener noreferrer" aria-label="Rahedul on Facebook" class="social-btn" style="background:#1877F2"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M14 8.5V6.8c0-.8.2-1.3 1.4-1.3H17V2.5h-2.6C11.1 2.5 10 4.4 10 6.5v2H7.5V12H10v9.5h4V12h2.7l.4-3.5H14z"/></svg></a>
+        <a href="https://www.instagram.com/rahedulshanto/" target="_blank" rel="noopener noreferrer" aria-label="Rahedul on Instagram" class="social-btn" style="background:linear-gradient(45deg,#F09433,#E6683C,#DC2743,#CC2366,#BC1888)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.8"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1.15" fill="#fff" stroke="none"/></svg></a>
+        <a href="https://www.youtube.com/@rahedulshanto?sub_confirmation=1" target="_blank" rel="noopener noreferrer" aria-label="Rahedul on YouTube" class="social-btn" style="background:#FF0000"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M9.8 7.6v8.8c0 .6.7 1 1.2.7l7-4.4c.5-.3.5-1 0-1.3l-7-4.4c-.5-.3-1.2.1-1.2.6z"/></svg></a>
+      </div>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+      const KEYS = {
+        tasks: "focusly-tasks-v1",
+        notes: "focusly-notes-v1",
+        bookmarks: "focusly-bookmarks-v1",
+        settings: "focusly-settings-v1",
+        stats: "focusly-stats-v1",
+        theme: "focusly-theme"
+      };
+
+      function readJSON(key, fallback) {
+        try {
+          const value = localStorage.getItem(key);
+          return value === null ? fallback : JSON.parse(value);
+        } catch (_) {
+          return fallback;
+        }
+      }
+
+      function writeJSON(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+          return true;
+        } catch (_) {
+          showToast("Unable to save. Browser storage may be full or disabled.");
+          return false;
+        }
+      }
+
+      let toastTimeout;
+      function showToast(message) {
+        const toast = $("#toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => toast.classList.remove("show"), 2400);
+      }
+
+      function localDateKey(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+
+      function escapeHTML(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
+        })[char]);
+      }
+
+      function makeId() {
+        return (crypto && typeof crypto.randomUUID === "function")
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+
+      // Theme
+      function updateThemeIcon() {
+        const isDark = document.documentElement.classList.contains("dark");
+        $("#theme-icon").innerHTML = isDark
+          ? '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"></path>'
+          : '<path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"></path>';
+        $("#theme-toggle").setAttribute("aria-label", `Switch to ${isDark ? "light" : "dark"} mode`);
+        const themeMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeMeta) themeMeta.setAttribute("content", isDark ? "#0d0e1a" : "#f4f4fb");
+      }
+
+      $("#theme-toggle").addEventListener("click", () => {
+        const isDark = document.documentElement.classList.toggle("dark");
+        try {
+          localStorage.setItem(KEYS.theme, isDark ? "dark" : "light");
+        } catch (_) {}
+        updateThemeIcon();
+      });
+      updateThemeIcon();
+
+      // Live greeting and clock
+      let activeTimeZone;
+      let dateFormatter, headerDateFormatter, timeFormatter, hourFormatter;
+      function buildFormatters() {
+        const zoneOption = activeTimeZone ? { timeZone: activeTimeZone } : {};
+        dateFormatter = new Intl.DateTimeFormat(undefined, {
+          ...zoneOption, weekday: "long", month: "long", day: "numeric", year: "numeric"
+        });
+        headerDateFormatter = new Intl.DateTimeFormat(undefined, {
+          ...zoneOption, weekday: "short", month: "short", day: "numeric"
+        });
+        timeFormatter = new Intl.DateTimeFormat(undefined, {
+          ...zoneOption, hour: "2-digit", minute: "2-digit", hour12: true
+        });
+        hourFormatter = new Intl.DateTimeFormat("en-US", {
+          ...zoneOption, hour: "numeric", hourCycle: "h23"
+        });
+      }
+      buildFormatters();
+
+      // One dropdown with every region. Picking a region points the clock,
+      // date and greeting at that region; "Local time" uses the device time.
+      const REGION_DATA = {
+        "Afghanistan": [["Kabul", "Asia/Kabul"]],
+        "Albania": [["Tirana", "Europe/Tirane"]],
+        "Algeria": [["Algiers", "Africa/Algiers"]],
+        "Andorra": [["Andorra la Vella", "Europe/Andorra"]],
+        "Angola": [["Luanda", "Africa/Luanda"]],
+        "Antigua and Barbuda": [["Saint John's", "America/Antigua"]],
+        "Argentina": [["Buenos Aires", "America/Argentina/Buenos_Aires"], ["Cordoba", "America/Argentina/Cordoba"]],
+        "Armenia": [["Yerevan", "Asia/Yerevan"]],
+        "Australia": [["Sydney", "Australia/Sydney"], ["Melbourne", "Australia/Sydney"], ["Brisbane", "Australia/Brisbane"], ["Adelaide", "Australia/Adelaide"], ["Perth", "Australia/Perth"], ["Hobart", "Australia/Hobart"], ["Darwin", "Australia/Darwin"]],
+        "Austria": [["Vienna", "Europe/Vienna"]],
+        "Azerbaijan": [["Baku", "Asia/Baku"]],
+        "Bahamas": [["Nassau", "America/Nassau"]],
+        "Bahrain": [["Manama", "Asia/Bahrain"]],
+        "Bangladesh": [["Dhaka", "Asia/Dhaka"]],
+        "Barbados": [["Bridgetown", "America/Barbados"]],
+        "Belarus": [["Minsk", "Europe/Minsk"]],
+        "Belgium": [["Brussels", "Europe/Brussels"]],
+        "Belize": [["Belmopan", "America/Belize"]],
+        "Benin": [["Porto-Novo", "Africa/Porto-Novo"]],
+        "Bhutan": [["Thimphu", "Asia/Thimphu"]],
+        "Bolivia": [["La Paz", "America/La_Paz"]],
+        "Bosnia and Herzegovina": [["Sarajevo", "Europe/Sarajevo"]],
+        "Botswana": [["Gaborone", "Africa/Gaborone"]],
+        "Brazil": [["Sao Paulo", "America/Sao_Paulo"], ["Rio de Janeiro", "America/Sao_Paulo"], ["Manaus", "America/Manaus"], ["Rio Branco", "America/Rio_Branco"]],
+        "Brunei": [["Bandar Seri Begawan", "Asia/Brunei"]],
+        "Bulgaria": [["Sofia", "Europe/Sofia"]],
+        "Burkina Faso": [["Ouagadougou", "Africa/Ouagadougou"]],
+        "Burundi": [["Bujumbura", "Africa/Bujumbura"]],
+        "Cabo Verde": [["Praia", "Atlantic/Cape_Verde"]],
+        "Cambodia": [["Phnom Penh", "Asia/Phnom_Penh"]],
+        "Cameroon": [["Yaounde", "Africa/Douala"]],
+        "Canada": [["Toronto", "America/Toronto"], ["Winnipeg", "America/Winnipeg"], ["Calgary", "America/Edmonton"], ["Vancouver", "America/Vancouver"], ["Halifax", "America/Halifax"], ["St. John's", "America/St_Johns"]],
+        "Central African Republic": [["Bangui", "Africa/Bangui"]],
+        "Chad": [["N'Djamena", "Africa/Ndjamena"]],
+        "Chile": [["Santiago", "America/Santiago"], ["Easter Island", "Pacific/Easter"]],
+        "China": [["Beijing", "Asia/Shanghai"], ["Shanghai", "Asia/Shanghai"], ["Hong Kong", "Asia/Hong_Kong"]],
+        "Colombia": [["Bogota", "America/Bogota"]],
+        "Comoros": [["Moroni", "Indian/Comoro"]],
+        "Congo": [["Brazzaville", "Africa/Brazzaville"]],
+        "Congo (DRC)": [["Kinshasa", "Africa/Kinshasa"], ["Lubumbashi", "Africa/Lubumbashi"]],
+        "Costa Rica": [["San Jose", "America/Costa_Rica"]],
+        "Croatia": [["Zagreb", "Europe/Zagreb"]],
+        "Cuba": [["Havana", "America/Havana"]],
+        "Cyprus": [["Nicosia", "Asia/Nicosia"]],
+        "Czechia": [["Prague", "Europe/Prague"]],
+        "Denmark": [["Copenhagen", "Europe/Copenhagen"]],
+        "Djibouti": [["Djibouti City", "Africa/Djibouti"]],
+        "Dominica": [["Roseau", "America/Dominica"]],
+        "Dominican Republic": [["Santo Domingo", "America/Santo_Domingo"]],
+        "Ecuador": [["Quito", "America/Guayaquil"], ["Galapagos", "Pacific/Galapagos"]],
+        "Egypt": [["Cairo", "Africa/Cairo"]],
+        "El Salvador": [["San Salvador", "America/El_Salvador"]],
+        "Equatorial Guinea": [["Malabo", "Africa/Malabo"]],
+        "Eritrea": [["Asmara", "Africa/Asmara"]],
+        "Estonia": [["Tallinn", "Europe/Tallinn"]],
+        "Eswatini": [["Mbabane", "Africa/Mbabane"]],
+        "Ethiopia": [["Addis Ababa", "Africa/Addis_Ababa"]],
+        "Fiji": [["Suva", "Pacific/Fiji"]],
+        "Finland": [["Helsinki", "Europe/Helsinki"]],
+        "France": [["Paris", "Europe/Paris"]],
+        "Gabon": [["Libreville", "Africa/Libreville"]],
+        "Gambia": [["Banjul", "Africa/Banjul"]],
+        "Georgia": [["Tbilisi", "Asia/Tbilisi"]],
+        "Germany": [["Berlin", "Europe/Berlin"], ["Munich", "Europe/Berlin"]],
+        "Ghana": [["Accra", "Africa/Accra"]],
+        "Greece": [["Athens", "Europe/Athens"]],
+        "Grenada": [["St. George's", "America/Grenada"]],
+        "Guatemala": [["Guatemala City", "America/Guatemala"]],
+        "Guinea": [["Conakry", "Africa/Conakry"]],
+        "Guinea-Bissau": [["Bissau", "Africa/Bissau"]],
+        "Guyana": [["Georgetown", "America/Guyana"]],
+        "Haiti": [["Port-au-Prince", "America/Port-au-Prince"]],
+        "Honduras": [["Tegucigalpa", "America/Tegucigalpa"]],
+        "Hungary": [["Budapest", "Europe/Budapest"]],
+        "Iceland": [["Reykjavik", "Atlantic/Reykjavik"]],
+        "India": [["Kolkata", "Asia/Kolkata"], ["Delhi", "Asia/Kolkata"], ["Mumbai", "Asia/Kolkata"]],
+        "Indonesia": [["Jakarta", "Asia/Jakarta"], ["Makassar", "Asia/Makassar"], ["Jayapura", "Asia/Jayapura"]],
+        "Iran": [["Tehran", "Asia/Tehran"]],
+        "Iraq": [["Baghdad", "Asia/Baghdad"]],
+        "Ireland": [["Dublin", "Europe/Dublin"]],
+        "Israel": [["Jerusalem", "Asia/Jerusalem"]],
+        "Italy": [["Rome", "Europe/Rome"]],
+        "Ivory Coast": [["Abidjan", "Africa/Abidjan"]],
+        "Jamaica": [["Kingston", "America/Jamaica"]],
+        "Japan": [["Tokyo", "Asia/Tokyo"]],
+        "Jordan": [["Amman", "Asia/Amman"]],
+        "Kazakhstan": [["Astana", "Asia/Almaty"], ["Almaty", "Asia/Almaty"]],
+        "Kenya": [["Nairobi", "Africa/Nairobi"]],
+        "Kiribati": [["Tarawa", "Pacific/Tarawa"]],
+        "Kuwait": [["Kuwait City", "Asia/Kuwait"]],
+        "Kyrgyzstan": [["Bishkek", "Asia/Bishkek"]],
+        "Laos": [["Vientiane", "Asia/Vientiane"]],
+        "Latvia": [["Riga", "Europe/Riga"]],
+        "Lebanon": [["Beirut", "Asia/Beirut"]],
+        "Lesotho": [["Maseru", "Africa/Maseru"]],
+        "Liberia": [["Monrovia", "Africa/Monrovia"]],
+        "Libya": [["Tripoli", "Africa/Tripoli"]],
+        "Liechtenstein": [["Vaduz", "Europe/Vaduz"]],
+        "Lithuania": [["Vilnius", "Europe/Vilnius"]],
+        "Luxembourg": [["Luxembourg City", "Europe/Luxembourg"]],
+        "Madagascar": [["Antananarivo", "Indian/Antananarivo"]],
+        "Malawi": [["Lilongwe", "Africa/Blantyre"]],
+        "Malaysia": [["Kuala Lumpur", "Asia/Kuala_Lumpur"], ["Kuching", "Asia/Kuching"]],
+        "Maldives": [["Male", "Indian/Maldives"]],
+        "Mali": [["Bamako", "Africa/Bamako"]],
+        "Malta": [["Valletta", "Europe/Malta"]],
+        "Marshall Islands": [["Majuro", "Pacific/Majuro"]],
+        "Mauritania": [["Nouakchott", "Africa/Nouakchott"]],
+        "Mauritius": [["Port Louis", "Indian/Mauritius"]],
+        "Mexico": [["Mexico City", "America/Mexico_City"], ["Cancun", "America/Cancun"], ["Mazatlan", "America/Mazatlan"], ["Tijuana", "America/Tijuana"]],
+        "Micronesia": [["Palikir", "Pacific/Chuuk"]],
+        "Moldova": [["Chisinau", "Europe/Chisinau"]],
+        "Monaco": [["Monaco", "Europe/Monaco"]],
+        "Mongolia": [["Ulaanbaatar", "Asia/Ulaanbaatar"]],
+        "Montenegro": [["Podgorica", "Europe/Podgorica"]],
+        "Morocco": [["Rabat", "Africa/Casablanca"]],
+        "Mozambique": [["Maputo", "Africa/Maputo"]],
+        "Myanmar": [["Yangon", "Asia/Yangon"]],
+        "Namibia": [["Windhoek", "Africa/Windhoek"]],
+        "Nauru": [["Yaren", "Pacific/Nauru"]],
+        "Nepal": [["Kathmandu", "Asia/Kathmandu"]],
+        "Netherlands": [["Amsterdam", "Europe/Amsterdam"]],
+        "New Zealand": [["Wellington", "Pacific/Auckland"], ["Auckland", "Pacific/Auckland"], ["Chatham Islands", "Pacific/Chatham"]],
+        "Nicaragua": [["Managua", "America/Managua"]],
+        "Niger": [["Niamey", "Africa/Niamey"]],
+        "Nigeria": [["Abuja", "Africa/Lagos"], ["Lagos", "Africa/Lagos"]],
+        "North Korea": [["Pyongyang", "Asia/Pyongyang"]],
+        "North Macedonia": [["Skopje", "Europe/Skopje"]],
+        "Norway": [["Oslo", "Europe/Oslo"]],
+        "Oman": [["Muscat", "Asia/Muscat"]],
+        "Pakistan": [["Karachi", "Asia/Karachi"], ["Lahore", "Asia/Karachi"], ["Islamabad", "Asia/Karachi"]],
+        "Palau": [["Ngerulmud", "Pacific/Palau"]],
+        "Palestine": [["Gaza", "Asia/Gaza"]],
+        "Panama": [["Panama City", "America/Panama"]],
+        "Papua New Guinea": [["Port Moresby", "Pacific/Port_Moresby"]],
+        "Paraguay": [["Asuncion", "America/Asuncion"]],
+        "Peru": [["Lima", "America/Lima"]],
+        "Philippines": [["Manila", "Asia/Manila"]],
+        "Poland": [["Warsaw", "Europe/Warsaw"]],
+        "Portugal": [["Lisbon", "Europe/Lisbon"], ["Azores", "Atlantic/Azores"]],
+        "Qatar": [["Doha", "Asia/Qatar"]],
+        "Romania": [["Bucharest", "Europe/Bucharest"]],
+        "Russia": [["Moscow", "Europe/Moscow"], ["Kaliningrad", "Europe/Kaliningrad"], ["Samara", "Europe/Samara"], ["Yekaterinburg", "Asia/Yekaterinburg"], ["Novosibirsk", "Asia/Novosibirsk"], ["Vladivostok", "Asia/Vladivostok"]],
+        "Rwanda": [["Kigali", "Africa/Kigali"]],
+        "Saint Kitts and Nevis": [["Basseterre", "America/St_Kitts"]],
+        "Saint Lucia": [["Castries", "America/St_Lucia"]],
+        "Saint Vincent and the Grenadines": [["Kingstown", "America/St_Vincent"]],
+        "Samoa": [["Apia", "Pacific/Apia"]],
+        "San Marino": [["San Marino", "Europe/Rome"]],
+        "Sao Tome and Principe": [["Sao Tome", "Africa/Sao_Tome"]],
+        "Saudi Arabia": [["Riyadh", "Asia/Riyadh"], ["Jeddah", "Asia/Riyadh"]],
+        "Senegal": [["Dakar", "Africa/Dakar"]],
+        "Serbia": [["Belgrade", "Europe/Belgrade"]],
+        "Seychelles": [["Victoria", "Indian/Mahe"]],
+        "Sierra Leone": [["Freetown", "Africa/Freetown"]],
+        "Singapore": [["Singapore", "Asia/Singapore"]],
+        "Slovakia": [["Bratislava", "Europe/Bratislava"]],
+        "Slovenia": [["Ljubljana", "Europe/Ljubljana"]],
+        "Solomon Islands": [["Honiara", "Pacific/Guadalcanal"]],
+        "Somalia": [["Mogadishu", "Africa/Mogadishu"]],
+        "South Africa": [["Johannesburg", "Africa/Johannesburg"], ["Cape Town", "Africa/Johannesburg"]],
+        "South Korea": [["Seoul", "Asia/Seoul"]],
+        "South Sudan": [["Juba", "Africa/Juba"]],
+        "Spain": [["Madrid", "Europe/Madrid"], ["Canary Islands", "Atlantic/Canary"]],
+        "Sri Lanka": [["Colombo", "Asia/Colombo"]],
+        "Sudan": [["Khartoum", "Africa/Khartoum"]],
+        "Suriname": [["Paramaribo", "America/Paramaribo"]],
+        "Sweden": [["Stockholm", "Europe/Stockholm"]],
+        "Switzerland": [["Zurich", "Europe/Zurich"]],
+        "Syria": [["Damascus", "Asia/Damascus"]],
+        "Tajikistan": [["Dushanbe", "Asia/Dushanbe"]],
+        "Tanzania": [["Dar es Salaam", "Africa/Dar_es_Salaam"]],
+        "Thailand": [["Bangkok", "Asia/Bangkok"]],
+        "Timor-Leste": [["Dili", "Asia/Dili"]],
+        "Togo": [["Lome", "Africa/Lome"]],
+        "Tonga": [["Nuku'alofa", "Pacific/Tongatapu"]],
+        "Trinidad and Tobago": [["Port of Spain", "America/Port_of_Spain"]],
+        "Tunisia": [["Tunis", "Africa/Tunis"]],
+        "Turkey": [["Istanbul", "Europe/Istanbul"], ["Ankara", "Europe/Istanbul"]],
+        "Turkmenistan": [["Ashgabat", "Asia/Ashgabat"]],
+        "Tuvalu": [["Funafuti", "Pacific/Funafuti"]],
+        "Uganda": [["Kampala", "Africa/Kampala"]],
+        "Ukraine": [["Kyiv", "Europe/Kyiv"]],
+        "United Arab Emirates": [["Dubai", "Asia/Dubai"], ["Abu Dhabi", "Asia/Dubai"]],
+        "United Kingdom": [["London", "Europe/London"]],
+        "United States": [["New York", "America/New_York"], ["Chicago", "America/Chicago"], ["Denver", "America/Denver"], ["Los Angeles", "America/Los_Angeles"], ["Anchorage", "America/Anchorage"], ["Honolulu", "Pacific/Honolulu"]],
+        "Uruguay": [["Montevideo", "America/Montevideo"]],
+        "Uzbekistan": [["Tashkent", "Asia/Tashkent"]],
+        "Vanuatu": [["Port Vila", "Pacific/Efate"]],
+        "Vatican City": [["Vatican City", "Europe/Rome"]],
+        "Venezuela": [["Caracas", "America/Caracas"]],
+        "Vietnam": [["Hanoi", "Asia/Ho_Chi_Minh"], ["Ho Chi Minh City", "Asia/Ho_Chi_Minh"]],
+        "Yemen": [["Sanaa", "Asia/Aden"]],
+        "Zambia": [["Lusaka", "Africa/Lusaka"]],
+        "Zimbabwe": [["Harare", "Africa/Harare"]]
+      };
+      const regionSelect = $("#region-select");
+      if (regionSelect) {
+        regionSelect.innerHTML = '<option value="">Local time</option>' +
+          Object.entries(REGION_DATA).sort(([a], [b]) => a.localeCompare(b)).map(([country, locations]) =>
+            `<optgroup label="${country}">` +
+            locations.map(([name, tz]) => `<option value="${tz}">${name}</option>`).join("") +
+            `</optgroup>`).join("");
+
+        let savedRegion = "";
+        const hashMatch = location.hash.match(/region=([^&]+)/);
+        if (hashMatch) {
+          try { savedRegion = decodeURIComponent(hashMatch[1]); } catch (_) { savedRegion = ""; }
+        }
+        if (!savedRegion && window.name.startsWith("focusly-region:")) {
+          savedRegion = window.name.slice("focusly-region:".length);
+        }
+        if (!savedRegion) {
+          try { savedRegion = localStorage.getItem("focusly-region-tz") || ""; } catch (_) { savedRegion = ""; }
+        }
+        if (savedRegion && [...regionSelect.options].some(option => option.value === savedRegion)) {
+          regionSelect.value = savedRegion;
+          activeTimeZone = savedRegion;
+          buildFormatters();
+        }
+
+        regionSelect.addEventListener("change", () => {
+          activeTimeZone = regionSelect.value || undefined;
+          buildFormatters();
+          updateClock();
+          try { localStorage.setItem("focusly-region-tz", regionSelect.value); } catch (_) {}
+          try { window.name = regionSelect.value ? "focusly-region:" + regionSelect.value : ""; } catch (_) {}
+          try {
+            history.replaceState(null, "", regionSelect.value
+              ? "#region=" + encodeURIComponent(regionSelect.value)
+              : location.href.split("#")[0]);
+          } catch (_) {}
+          const option = regionSelect.options[regionSelect.selectedIndex];
+          showToast(option && regionSelect.value ? "Region: " + option.textContent : "Region: Local time");
+        });
+      }
+
+      function updateClock() {
+        const now = new Date();
+        const hour = Number(hourFormatter.format(now)) % 24;
+        const greeting =
+          hour >= 5 && hour < 12 ? "Good morning." :
+          hour >= 12 && hour < 15 ? "Good noon." :
+          hour >= 15 && hour < 19 ? "Good afternoon." :
+          "Good night.";
+        $("#greeting-title").textContent = greeting;
+        $("#hero-time").textContent = timeFormatter.format(now);
+        $("#hero-date").textContent = dateFormatter.format(now);
+        $("#header-date").textContent = headerDateFormatter.format(now);
+        $("#header-time").textContent = timeFormatter.format(now);
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      // Daily task manager
+      let tasks = readJSON(KEYS.tasks, []);
+      if (!Array.isArray(tasks)) tasks = [];
+      tasks = tasks.filter(task =>
+        task && typeof task.id === "string" &&
+        typeof task.title === "string" &&
+        ["high", "medium", "low"].includes(task.priority)
+      ).map(task => ({
+        id: task.id,
+        title: task.title.slice(0, 180),
+        priority: task.priority,
+        completed: Boolean(task.completed),
+        createdAt: Number(task.createdAt) || Date.now()
+      }));
+
+      let activeFilter = "all";
+
+      function saveTasks() {
+        writeJSON(KEYS.tasks, tasks);
+      }
+
+      function updateTaskStats() {
+        const completed = tasks.filter(task => task.completed).length;
+        $("#stat-completed").textContent = completed;
+        $("#stat-task-total").textContent = `of ${tasks.length} tasks`;
+        $("#task-count-badge").textContent = `${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`;
+        $("#task-progress").style.width = tasks.length ? `${completed / tasks.length * 100}%` : "0%";
+      }
+
+      function renderTasks() {
+        const list = $("#task-list");
+        const visibleTasks = tasks
+          .filter(task => activeFilter === "all" ||
+            (activeFilter === "active" && !task.completed) ||
+            (activeFilter === "completed" && task.completed))
+          .sort((a, b) => Number(a.completed) - Number(b.completed) ||
+            ({ high: 0, medium: 1, low: 2 }[a.priority] - { high: 0, medium: 1, low: 2 }[b.priority]) ||
+            a.createdAt - b.createdAt);
+
+        if (!visibleTasks.length) {
+          const message = activeFilter === "completed"
+            ? "No completed tasks yet."
+            : activeFilter === "active"
+              ? "You're all caught up. Enjoy the breathing room."
+              : "Your task list is ready. Add your first task above.";
+          list.innerHTML = `<div class="empty-state">${escapeHTML(message)}</div>`;
+        } else {
+          list.innerHTML = visibleTasks.map(task => `
+            <div class="task-row ${task.completed ? "completed" : ""}" data-task-id="${escapeHTML(task.id)}">
+              <input class="task-check" type="checkbox" aria-label="Mark ${escapeHTML(task.title)} as ${task.completed ? "pending" : "completed"}" ${task.completed ? "checked" : ""}>
+              <div class="min-w-0 flex-1">
+                <p class="task-title break-words text-sm font-medium">${escapeHTML(task.title)}</p>
+                <div class="mt-1.5">
+                  <span class="priority priority-${task.priority}">
+                    <span aria-hidden="true">●</span>${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </span>
+                </div>
+              </div>
+              <button class="icon-btn delete-task" type="button" aria-label="Delete task: ${escapeHTML(task.title)}" title="Delete task">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18m-2 0-.9 14H5.9L5 6m4 0V4h6v2m-5 4v6m4-6v6"></path></svg>
+              </button>
+            </div>
+          `).join("");
+        }
+        updateTaskStats();
+      }
+
+      function addTaskFromForm(event) {
+        if (event) event.preventDefault();
+        const input = $("#task-input");
+        const title = input.value.trim();
+        if (!title) {
+          input.focus();
+          return;
+        }
+
+        tasks.push({
+          id: makeId(),
+          title: title.slice(0, 180),
+          priority: $("#task-priority").value,
+          completed: false,
+          createdAt: Date.now()
+        });
+        saveTasks();
+        activeFilter = "all";
+        $$(".mode-btn[data-filter]").forEach(button => {
+          const active = button.dataset.filter === activeFilter;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        renderTasks();
+        input.value = "";
+        input.focus();
+        showToast("Task added.");
+      }
+
+      $("#task-form").addEventListener("submit", addTaskFromForm);
+      $("#add-task-btn").addEventListener("click", addTaskFromForm);
+      $("#task-input").addEventListener("keydown", event => {
+        if (event.key === "Enter") addTaskFromForm(event);
+      });
+
+      $("#task-list").addEventListener("change", event => {
+        if (!event.target.matches(".task-check")) return;
+        const row = event.target.closest("[data-task-id]");
+        const task = tasks.find(item => item.id === row?.dataset.taskId);
+        if (!task) return;
+        task.completed = event.target.checked;
+        saveTasks();
+        renderTasks();
+        showToast(task.completed ? "Task completed. Nice work!" : "Task marked as pending.");
+      });
+
+      $("#task-list").addEventListener("click", event => {
+        const button = event.target.closest(".delete-task");
+        if (!button) return;
+        const row = button.closest("[data-task-id]");
+        tasks = tasks.filter(task => task.id !== row.dataset.taskId);
+        saveTasks();
+        renderTasks();
+        showToast("Task deleted.");
+      });
+
+      $$("[data-filter]").forEach(button => {
+        button.addEventListener("click", () => {
+          activeFilter = button.dataset.filter;
+          $$("[data-filter]").forEach(item => {
+            const active = item === button;
+            item.classList.toggle("active", active);
+            item.setAttribute("aria-pressed", String(active));
+          });
+          renderTasks();
+        });
+      });
+
+      $("#clear-completed").addEventListener("click", () => {
+        const count = tasks.filter(task => task.completed).length;
+        if (!count) {
+          showToast("No completed tasks to clear.");
+          return;
+        }
+        tasks = tasks.filter(task => !task.completed);
+        saveTasks();
+        renderTasks();
+        showToast(`${count} completed ${count === 1 ? "task" : "tasks"} cleared.`);
+      });
+
+      renderTasks();
+
+      // Five configurable bookmarks
+      const defaultBookmarks = [
+        { name: "YouTube", url: "https://www.youtube.com/", color: "#ff4545", letter: "Y" },
+        { name: "ChatGPT", url: "https://chatgpt.com/", color: "#10a37f", letter: "C" },
+        { name: "Canva", url: "https://www.canva.com/", color: "#7c83fd", letter: "C" },
+        { name: "Google Drive", url: "https://drive.google.com/", color: "#34a853", letter: "D" },
+        { name: "Notion", url: "https://www.notion.so/", color: "#a1a1aa", letter: "N" }
+      ];
+
+      const bookmarkPalette = ["#ff4545", "#10a37f", "#7c83fd", "#34a853", "#f59e0b", "#ec4899", "#06b6d4", "#a1a1aa"];
+      let bookmarks = readJSON(KEYS.bookmarks, defaultBookmarks);
+      if (!Array.isArray(bookmarks)) bookmarks = defaultBookmarks.slice();
+      bookmarks = bookmarks.filter(bookmark =>
+        bookmark && typeof bookmark.name === "string" &&
+        typeof bookmark.url === "string" && isSafeURL(bookmark.url)
+      ).map((bookmark, index) => ({
+        name: bookmark.name.slice(0, 40),
+        url: bookmark.url,
+        color: typeof bookmark.color === "string" && /^#[0-9a-f]{6}$/i.test(bookmark.color) ? bookmark.color : bookmarkPalette[index % bookmarkPalette.length],
+        letter: bookmark.name.trim().charAt(0).toUpperCase() || "?"
+      }));
+      if (!bookmarks.length) bookmarks = defaultBookmarks.slice();
+
+      function isSafeURL(value) {
+        try {
+          const url = new URL(value);
+          return url.protocol === "https:" || url.protocol === "http:";
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function saveBookmarks() {
+        writeJSON(KEYS.bookmarks, bookmarks);
+      }
+
+      function renderBookmarks() {
+        $("#bookmark-grid").innerHTML = bookmarks.map((bookmark, index) => `
+          <div class="bookmark-wrap">
+            <a class="bookmark" href="${escapeHTML(bookmark.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHTML(bookmark.name)} in a new tab">
+              <span class="app-icon" style="background:${escapeHTML(bookmark.color)}1a;color:${escapeHTML(bookmark.color)}">${escapeHTML(bookmark.letter)}</span>
+              <span class="flex w-full min-w-0 items-center justify-between gap-2">
+                <span class="truncate text-xs font-semibold">${escapeHTML(bookmark.name)}</span>
+                <span class="muted text-xs" aria-hidden="true">↗</span>
+              </span>
+            </a>
+            <button class="bookmark-remove" type="button" data-remove="${index}" aria-label="Remove ${escapeHTML(bookmark.name)}">&times;</button>
+          </div>
+        `).join("");
+      }
+
+      renderBookmarks();
+
+      let bookmarksEditing = false;
+      function setBookmarksEditing(on) {
+        bookmarksEditing = on;
+        $("#bookmark-form").classList.toggle("hidden", !on);
+        $("#bookmark-grid").classList.toggle("editing", on);
+        $("#edit-bookmarks").textContent = on ? "Done" : "Edit links";
+      }
+
+      $("#edit-bookmarks").addEventListener("click", () => {
+        setBookmarksEditing(!bookmarksEditing);
+        if (bookmarksEditing) $("#bookmark-name").focus();
+      });
+
+      $("#cancel-bookmark").addEventListener("click", () => setBookmarksEditing(false));
+
+      $("#bookmark-grid").addEventListener("click", event => {
+        const removeBtn = event.target.closest("[data-remove]");
+        if (!removeBtn) return;
+        event.preventDefault();
+        const removed = bookmarks.splice(Number(removeBtn.dataset.remove), 1)[0];
+        saveBookmarks();
+        renderBookmarks();
+        showToast(removed ? `Removed ${removed.name}.` : "Link removed.");
+      });
+
+      function normalizeURL(value) {
+        const trimmed = value.trim();
+        if (!trimmed) return "";
+        return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : "https://" + trimmed;
+      }
+
+      function addBookmarkFromForm(event) {
+        if (event) event.preventDefault();
+        const name = $("#bookmark-name").value.trim();
+        const url = normalizeURL($("#bookmark-url").value);
+
+        if (!name || name.length > 40 || !isSafeURL(url)) {
+          showToast("Enter a valid app name and website URL.");
+          return;
+        }
+
+        bookmarks.push({
+          name,
+          url,
+          color: bookmarkPalette[bookmarks.length % bookmarkPalette.length],
+          letter: name.charAt(0).toUpperCase()
+        });
+        saveBookmarks();
+        renderBookmarks();
+        $("#bookmark-name").value = "";
+        $("#bookmark-url").value = "";
+        $("#bookmark-name").focus();
+        showToast(`${name} added.`);
+      }
+
+      $("#bookmark-form").addEventListener("submit", addBookmarkFromForm);
+      $("#add-link-btn").addEventListener("click", addBookmarkFromForm);
+
+      // Pomodoro timer
+      const defaultSettings = {
+        focus: 25,
+        short: 5,
+        long: 15,
+        autoStart: false
+      };
+
+      let settings = readJSON(KEYS.settings, defaultSettings);
+      if (!settings || typeof settings !== "object") settings = { ...defaultSettings };
+
+      settings = {
+        focus: validMinutes(settings.focus, 25, 1, 120),
+        short: validMinutes(settings.short, 5, 1, 60),
+        long: validMinutes(settings.long, 15, 1, 90),
+        autoStart: settings.autoStart === true
+      };
+
+      function validMinutes(value, fallback, min, max) {
+        const number = Number(value);
+        return Number.isInteger(number) && number >= min && number <= max ? number : fallback;
+      }
+
+      const modes = {
+        focus: { label: "Focus", status: "Ready to focus" },
+        short: { label: "Short break", status: "Take a breather" },
+        long: { label: "Long break", status: "Recharge and reset" }
+      };
+
+      let mode = "focus";
+      let remainingMs = settings.focus * 60_000;
+      let totalMs = remainingMs;
+      let deadline = null;
+      let running = false;
+      let tickHandle = null;
+      let sessionCount = 0;
+      let accumulatedFocusMs = 0;
+      let statsDate = localDateKey();
+
+      let stats = readJSON(KEYS.stats, {});
+      if (!stats || typeof stats !== "object" || Array.isArray(stats)) stats = {};
+
+      function normalizeStats() {
+        if (!stats[statsDate] || typeof stats[statsDate] !== "object") {
+          stats[statsDate] = { sessions: 0, focusMs: 0 };
+        }
+        const today = stats[statsDate];
+        sessionCount = Number.isInteger(today.sessions) && today.sessions >= 0 ? today.sessions : 0;
+        accumulatedFocusMs = Number.isFinite(today.focusMs) && today.focusMs >= 0 ? today.focusMs : 0;
+      }
+
+      normalizeStats();
+
+      function persistStats() {
+        stats[statsDate] = {
+          sessions: sessionCount,
+          focusMs: accumulatedFocusMs
+        };
+        writeJSON(KEYS.stats, stats);
+      }
+
+      function updateStatsUI() {
+        $("#stat-sessions").textContent = sessionCount;
+        $("#stat-focus").textContent = formatFocusTime(accumulatedFocusMs);
+        const dots = $("#session-dots");
+        const visibleDots = Math.min(sessionCount, 8);
+        dots.innerHTML = Array.from({ length: visibleDots }, () =>
+          '<span class="h-2.5 w-2.5 rounded-full" style="background:var(--accent)"></span>'
+        ).join("") + (sessionCount > 8
+          ? `<span class="muted ml-1 text-xs">+${sessionCount - 8}</span>`
+          : "");
+        if (!visibleDots) {
+          dots.innerHTML = '<span class="muted text-xs">No sessions yet</span>';
+        }
+        dots.setAttribute("aria-label", `${sessionCount} focus sessions completed`);
+      }
+
+      function formatFocusTime(ms) {
+        const minutes = Math.floor(ms / 60_000);
+        const hours = Math.floor(minutes / 60);
+        return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+      }
+
+      function formatRemaining(ms) {
+        const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function currentModeDuration() {
+        return settings[mode] * 60_000;
+      }
+
+      function updateTimerUI() {
+        const display = formatRemaining(remainingMs);
+        $("#timer-display").textContent = display;
+        $("#timer-ring").style.setProperty("--progress", `${Math.max(0, Math.min(100, remainingMs / totalMs * 100))}%`);
+        $("#timer-ring").setAttribute("aria-label", `${display} remaining`);
+        document.title = running ? `${display} · ${modes[mode].label} — Focusly` : "Focusly — Productivity Dashboard";
+        $("#timer-status").textContent = running ? "You're in the zone" : modes[mode].status;
+
+        $("#timer-start-label").textContent = running ? "Pause" : remainingMs < totalMs ? "Resume" : mode === "focus" ? "Start focus" : "Start break";
+        $("#timer-start-icon").innerHTML = running
+          ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"></path>'
+          : '<path d="M8 5v14l11-7z"></path>';
+
+        $$("[data-mode]").forEach(button => {
+          const active = button.dataset.mode === mode;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+      }
+
+      function stopTicker() {
+        if (tickHandle !== null) {
+          clearInterval(tickHandle);
+          tickHandle = null;
+        }
+      }
+
+      function syncDailyStats() {
+        const today = localDateKey();
+        if (today === statsDate) return;
+
+        statsDate = today;
+        normalizeStats();
+        persistStats();
+        updateStatsUI();
+      }
+
+      function updateTimer() {
+        syncDailyStats();
+
+        if (!running || deadline === null) return;
+
+        remainingMs = Math.max(0, deadline - Date.now());
+
+        if (remainingMs <= 0) {
+          completeSession();
+          return;
+        }
+
+        updateTimerUI();
+      }
+
+      function startTicker() {
+        stopTicker();
+        tickHandle = setInterval(updateTimer, 250);
+      }
+
+      function pauseTimer() {
+        if (!running) return;
+        remainingMs = Math.max(0, deadline - Date.now());
+        running = false;
+        deadline = null;
+        stopTicker();
+        updateTimerUI();
+      }
+
+      function startTimer() {
+        if (remainingMs <= 0) remainingMs = currentModeDuration();
+        totalMs = Math.max(totalMs, remainingMs);
+        running = true;
+        deadline = Date.now() + remainingMs;
+        updateTimerUI();
+        startTicker();
+      }
+
+      function selectMode(nextMode, options = {}) {
+        if (!modes[nextMode]) return;
+
+        running = false;
+        deadline = null;
+        stopTicker();
+
+        mode = nextMode;
+        totalMs = currentModeDuration();
+        remainingMs = totalMs;
+
+        updateTimerUI();
+
+        if (options.start === true) startTimer();
+      }
+
+      function playNotification() {
+        // Best effort: browser sound requires user interaction in some browsers.
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          const context = new AudioContextClass();
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = "sine";
+          oscillator.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, context.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillator.start();
+          oscillator.stop(context.currentTime + 0.36);
+          oscillator.onended = () => context.close().catch(() => {});
+        } catch (_) {}
+      }
+
+      function notifySession(message) {
+        if ("Notification" in window && Notification.permission === "granted") {
+          try {
+            new Notification("Focusly", { body: message });
+          } catch (_) {}
+        }
+      }
+
+      async function requestNotificationPermission() {
+        if (!("Notification" in window) || Notification.permission !== "default") return;
+        try {
+          await Notification.requestPermission();
+        } catch (_) {}
+      }
+
+      function completeSession() {
+        running = false;
+        deadline = null;
+        remainingMs = 0;
+        stopTicker();
+
+        if (mode === "focus") {
+          sessionCount += 1;
+          accumulatedFocusMs += totalMs;
+          persistStats();
+          updateStatsUI();
+        }
+
+        playNotification();
+
+        const message = mode === "focus"
+          ? "Focus session complete. Time to take a break."
+          : "Break complete. Ready for another session?";
+
+        notifySession(message);
+        showToast(message);
+
+        let nextMode = mode;
+        if (mode === "focus") {
+          nextMode = sessionCount % 4 === 0 ? "long" : "short";
+        } else {
+          nextMode = "focus";
+        }
+
+        selectMode(nextMode, { start: settings.autoStart });
+      }
+
+      $("#timer-start").addEventListener("click", async () => {
+        if (running) {
+          pauseTimer();
+          return;
+        }
+        await requestNotificationPermission();
+        startTimer();
+      });
+
+      $("#timer-reset").addEventListener("click", () => {
+        running = false;
+        deadline = null;
+        stopTicker();
+        remainingMs = currentModeDuration();
+        totalMs = remainingMs;
+        updateTimerUI();
+        showToast("Timer reset.");
+      });
+
+      $$("[data-mode]").forEach(button => {
+        button.addEventListener("click", () => {
+          selectMode(button.dataset.mode);
+        });
+      });
+
+      function saveSettingsFromForm(event) {
+        if (event) event.preventDefault();
+
+        const focus = Number($("#setting-focus").value);
+        const short = Number($("#setting-short").value);
+        const long = Number($("#setting-long").value);
+
+        if (!Number.isInteger(focus) || focus < 1 || focus > 120 ||
+            !Number.isInteger(short) || short < 1 || short > 60 ||
+            !Number.isInteger(long) || long < 1 || long > 90) {
+          showToast("Please enter valid timer durations.");
+          return;
+        }
+
+        settings = {
+          focus,
+          short,
+          long,
+          autoStart: $("#setting-autostart").checked
+        };
+
+        writeJSON(KEYS.settings, settings);
+        running = false;
+        deadline = null;
+        stopTicker();
+        totalMs = currentModeDuration();
+        remainingMs = totalMs;
+        updateTimerUI();
+        showToast("Timer settings saved.");
+      }
+
+      $("#timer-settings").addEventListener("submit", saveSettingsFromForm);
+      $("#save-settings-btn").addEventListener("click", saveSettingsFromForm);
+
+      $("#setting-focus").value = settings.focus;
+      $("#setting-short").value = settings.short;
+      $("#setting-long").value = settings.long;
+      $("#setting-autostart").checked = settings.autoStart;
+
+      // Recover gracefully from system sleep and tab suspension.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && running) updateTimer();
+      });
+
+      window.addEventListener("pageshow", () => {
+        if (running) updateTimer();
+      });
+
+      window.addEventListener("beforeunload", () => {
+        if (running && deadline !== null) {
+          try {
+            sessionStorage.setItem("focusly-running-timer", JSON.stringify({
+              mode,
+              deadline,
+              totalMs
+            }));
+          } catch (_) {}
+        }
+      });
+
+      // Notes: save on input, with debounced status feedback.
+      const notesArea = $("#notes-area");
+      notesArea.value = (() => {
+        try {
+          return localStorage.getItem(KEYS.notes) || "";
+        } catch (_) {
+          return "";
+        }
+      })();
+
+      let notesSaveTimeout;
+      notesArea.addEventListener("input", () => {
+        $("#notes-status").textContent = "Saving…";
+        clearTimeout(notesSaveTimeout);
+        notesSaveTimeout = setTimeout(() => {
+          try {
+            localStorage.setItem(KEYS.notes, notesArea.value);
+            $("#notes-status").textContent = "Saved locally";
+          } catch (_) {
+            $("#notes-status").textContent = "Could not save";
+            showToast("Unable to save notes. Browser storage may be full.");
+          }
+        }, 250);
+      });
+
+      $("#clear-notes").addEventListener("click", () => {
+        if (!notesArea.value) {
+          showToast("Your notes are already empty.");
+          return;
+        }
+        if (!confirm("Clear all your notes? This cannot be undone.")) return;
+        notesArea.value = "";
+        try {
+          localStorage.removeItem(KEYS.notes);
+          $("#notes-status").textContent = "Saved locally";
+        } catch (_) {
+          $("#notes-status").textContent = "Could not save";
+        }
+        showToast("Notes cleared.");
+      });
+
+      $("#notes-details").addEventListener("toggle", () => {
+        $("#notes-chevron").style.transform = $("#notes-details").open ? "rotate(0deg)" : "rotate(-90deg)";
+      });
+
+      // Daily reminders
+      const quotes = [
+        "You don't need a perfect day. You just need a good next step.",
+        "Protect your focus like you protect your time.",
+        "Done is better than endlessly perfect.",
+        "Small, consistent actions create meaningful progress.",
+        "Start where you are. Use what you have. Do what you can.",
+        "Make it easy to begin, and momentum will follow.",
+        "One focused hour can change the shape of your day."
+      ];
+      const motivationEl = $("#motivation-text");
+      let quoteIndex = 0;
+      if (motivationEl && quotes.length > 1) {
+        setInterval(() => {
+          motivationEl.style.opacity = "0";
+          setTimeout(() => {
+            quoteIndex = (quoteIndex + 1) % quotes.length;
+            motivationEl.textContent = quotes[quoteIndex];
+            motivationEl.style.opacity = "1";
+          }, 450);
+        }, 4500);
+      }
+
+      // Keyboard shortcuts: ignore typing fields and native controls.
+      document.addEventListener("keydown", event => {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const target = event.target;
+        if (target instanceof HTMLElement &&
+            (target.isContentEditable || /INPUT|TEXTAREA|SELECT|BUTTON/.test(target.tagName))) return;
+
+        if (event.code === "Space") {
+          event.preventDefault();
+          if (running) pauseTimer();
+          else startTimer();
+        } else if (event.key.toLowerCase() === "r") {
+          running = false;
+          deadline = null;
+          stopTicker();
+          remainingMs = currentModeDuration();
+          totalMs = remainingMs;
+          updateTimerUI();
+        }
+      });
+
+      // Restore timer only when the browser page was reloaded in this session.
+      try {
+        const savedTimer = JSON.parse(sessionStorage.getItem("focusly-running-timer") || "null");
+        if (savedTimer && modes[savedTimer.mode] &&
+            Number.isFinite(savedTimer.deadline) &&
+            Number.isFinite(savedTimer.totalMs)) {
+          sessionStorage.removeItem("focusly-running-timer");
+          mode = savedTimer.mode;
+          totalMs = savedTimer.totalMs;
+          remainingMs = Math.max(0, savedTimer.deadline - Date.now());
+
+          if (remainingMs > 0) {
+            deadline = savedTimer.deadline;
+            running = true;
+            updateTimerUI();
+            startTicker();
+          } else {
+            running = true;
+            completeSession();
+          }
+        }
+      } catch (_) {}
+
+      updateStatsUI();
+      updateTimerUI();
+    })();
+  </script>
+</body>
+</html>
